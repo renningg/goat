@@ -60,7 +60,7 @@ Removing that permission applies to later requests and to results still on the h
 
 ## Review conflicts
 
-When devices make conflicting changes, only the conflicting memory is put on hold. GOAT automatically resolves it using the resolving device’s default provider and model, and applies the result without waiting for approval. If one of the conflicting versions is unverified, GOAT skips the model call and leaves the memory on hold for you to review. A failed resolution also leaves the memory on hold.
+When devices make conflicting changes, only the conflicting memory is put on hold. GOAT automatically resolves it using the resolving device’s default provider and model, and applies the result without waiting for approval. If one of the conflicting versions is unverified, GOAT skips the model call and leaves the memory on hold for you to review. A failed resolution also leaves the memory on hold. If the model requests a review of two conflicting versions, open the memory in Settings, compare the versions, and choose the one to keep. The hub accepts the choice while those two versions are still current. If another edit arrives first, open the latest conflict before choosing again.
 
 Open the memory’s history to review the resolution and judgment. The conflicting originals and judgment are kept for 30 days unless the memory is forgotten. Within 30 days of each resolution, choose a retained original and use **Revert resolution** to restore it once. Reverting requires the resolved memory to be unchanged and its original still available; a revert cannot itself be reverted. Deletion takes priority over edits, so an older edit cannot bring back a forgotten memory.
 

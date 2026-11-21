@@ -268,6 +268,7 @@ export const make = Effect.gen(function* () {
         protocolVersion: 1,
         refusedReverts: true,
         resolutionInputs: true,
+        conflictReview: true,
         retainedLocalSpace: true,
         provenanceProjection: true,
         derivedCap: 1000,

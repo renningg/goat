@@ -1,3 +1,4 @@
+import { MemoryConflictReview } from "./MemoryConflictReview";
 import { MemoryForgetControl } from "./MemoryForgetControl";
 import { MemoryMoveControl } from "./MemoryMoveControl";
 import {
@@ -877,6 +878,10 @@ export function MemoryDetails({
   memoryEnabled: boolean;
 }) {
   const registry = useContext(RegistryContext);
+  const conflictReview =
+    useEnvironment(environmentId)?.serverConfig?.environment.capabilities.memory?.conflictReview ===
+    true;
+  const [conflictNotice, setConflictNotice] = useState("");
   const { environments } = useEnvironments();
   const deviceName = (id: EnvironmentId) =>
     environments.find((e) => e.environmentId === id)?.label ?? "Unknown device";
@@ -997,6 +1002,7 @@ export function MemoryDetails({
       >
         <div ref={detailsRef} tabIndex={-1} aria-label="Memory details" className="space-y-3">
           {read.error || history.error ? <p role="alert">{read.error ?? history.error}</p> : null}
+          {conflictNotice ? <p role="status">{conflictNotice}</p> : null}
           {moved ? <p role="status">Memory moved.</p> : null}
           {edit.notice ? <p role="status">{edit.notice}</p> : null}
           {!edit.start && edit.saveMessage ? <p role="status">{edit.saveMessage}</p> : null}
@@ -1020,6 +1026,20 @@ export function MemoryDetails({
               <p>
                 {presentMemoryItem(item).syncLabel} {presentMemoryItem(item).cleanupLabel}
               </p>
+              {conflictReview && item.status === "quarantined" ? (
+                <MemoryConflictReview
+                  key={item.conflict.conflictId}
+                  item={item}
+                  environmentId={environmentId}
+                  canWrite={canWrite}
+                  deviceName={deviceName}
+                  onNotice={setConflictNotice}
+                  refresh={() => {
+                    read.refresh();
+                    history.refresh();
+                  }}
+                />
+              ) : null}
               {item.status === "active" ? (
                 <>
                   <p className="whitespace-pre-wrap break-words">{item.payload.text}</p>

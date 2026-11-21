@@ -794,7 +794,7 @@ it.effect(
     }).pipe(Effect.provide(NodeServices.layer)),
 );
 
-it.effect("keeps pnpm and yarn quarantined when the model requests review", () =>
+it.effect.each([false, true])("reviews pnpm and yarn (third edit=%s)", (thirdEdit) =>
   Effect.gen(function* () {
     const c = yield* cluster((input, environmentId) =>
       Effect.succeed({
@@ -852,6 +852,109 @@ it.effect("keeps pnpm and yarn quarantined when the model requests review", () =
     assert.strictEqual(refusal._tag, "MemoryHubError");
     assert.strictEqual(refusal._tag === "MemoryHubError" && refusal.code, "needs_review");
     assert.strictEqual(c.a.generated() + c.h.generated() + c.b.generated(), 1);
+    const preview = yield* c.h.run(
+      Service.MemoryService.use((service) =>
+        service.history(
+          { memorySpaceId: c.space, memoryId: target, limit: 1, includeConflictVersions: true },
+          Effect.void,
+        ),
+      ),
+    );
+    const selected = preview.conflictVersions?.find(
+      ({ payload }) => payload?.text === "The project uses pnpm.",
+    );
+    if (!selected?.payload) return yield* Effect.die("missing selectable pnpm version");
+    const { revision, payload } = selected;
+    if (thirdEdit) {
+      const revisionId = M.MemoryRevisionId.make(id(1145));
+      const operationId = M.MemoryOperationId.make(id(1144));
+      const pushed = yield* c.a.run(
+        Client.MemoryHubClient.use((client) =>
+          client.push(connection, {
+            protocolVersion: 1,
+            memorySpaceId: c.space,
+            environmentId: c.a.identity,
+            operations: [
+              {
+                kind: "upsert",
+                protocolVersion: 1,
+                memorySpaceId: c.space,
+                memoryId: target,
+                operationId,
+                originEnvironmentId: c.a.identity,
+                expectedHeads: heads,
+                revision: {
+                  memorySpaceId: c.space,
+                  memoryId: target,
+                  operationId,
+                  revisionId,
+                  payloadRef: revisionId,
+                  parents: heads,
+                  scope: revision.scope,
+                  assertionKind: "inference",
+                  provenance: { environmentId: c.a.identity },
+                  createdAtUtc: M.MemoryUtcTimestamp.make("1970-01-01T00:00:00.000Z"),
+                },
+                payload: {
+                  text: "The project uses npm again.",
+                  evidence: [],
+                  derivedFromMemoryRevisions: [],
+                },
+              },
+            ],
+          }),
+        ),
+      );
+      assert.strictEqual(pushed.receipts[0]?.outcome, "conflicted");
+    }
+    const choice = c.h.run(
+      Service.MemoryService.use((service) =>
+        service.upsert(
+          {
+            memorySpaceId: c.space,
+            memoryId: target,
+            operationId: id(1143),
+            expectedHeads: [...hub.heads].sort(),
+            reviewedRevisionId: revision.revisionId,
+            scope: revision.scope,
+            assertionKind: revision.assertionKind,
+            payload,
+            baseBoundary: null,
+          },
+          Effect.void,
+        ),
+      ),
+    );
+    if (thirdEdit) {
+      const refused = yield* Effect.flip(choice);
+      assert.strictEqual(refused._tag, "MemoryStoreConflict");
+      assert.strictEqual(
+        refused._tag === "MemoryStoreConflict" && refused.code,
+        "conflict_changed",
+      );
+      assert.lengthOf((yield* c.h.aggregate(c.space, target)).heads, 3);
+      return;
+    }
+    assert.strictEqual((yield* choice).receipt.outcome, "accepted");
+    yield* c.h.tick;
+    const finalReceipt = yield* c.h.run(
+      Store.MemoryStore.use((store) =>
+        store.readHubReceiptTx(c.space, M.MemoryOperationId.make(id(1143))).pipe(store.transact),
+      ),
+    );
+    assert.include(
+      finalReceipt?.entry.receipt,
+      { outcome: "accepted" },
+      String(finalReceipt?.entry.receipt.failureCode),
+    );
+    yield* c.a.tick;
+    yield* c.b.tick;
+    for (const replica of [c.h, c.a, c.b]) {
+      assert.strictEqual(
+        activeText(yield* replica.aggregate(c.space, target)),
+        "The project uses pnpm.",
+      );
+    }
   }).pipe(Effect.provide(NodeServices.layer)),
 );
 

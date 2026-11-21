@@ -1737,6 +1737,32 @@ const make = Effect.fnUntraced(function* (
           return result.page;
         }
         const { page, consumed } = yield* store.historyPage(value, current.item, environmentId);
+        if (
+          value.includeConflictVersions &&
+          sourceThread === undefined &&
+          current.item.status === "quarantined" &&
+          current.item.conflict.heads.length === 2
+        ) {
+          const snapshot = yield* store.readResolutionSnapshot(value.memorySpaceId, value.memoryId);
+          const versions = yield* store.readResolutionHeads({
+            memorySpaceId: value.memorySpaceId,
+            memoryId: value.memoryId,
+            expectedGeneration: snapshot.generation,
+            heads: current.item.conflict.heads,
+            maxItems: 2,
+            maxBytes: 48 * 1024,
+          });
+          yield* permit;
+          return yield* checkedHistoryPage({
+            ...page,
+            revisions: [],
+            resolutions: [],
+            reports: [],
+            revertResults: [],
+            nextCursor: null,
+            conflictVersions: versions,
+          });
+        }
         yield* permit;
         yield* consume(value.memorySpaceId, sourceThread, consumed);
         return yield* checkedHistoryPage(page);
@@ -2098,6 +2124,35 @@ const make = Effect.fnUntraced(function* (
     );
     // Only the read-only semantic decision is caught; every subsequent write can fail the outer transaction.
     const prepared = yield* Effect.gen(function* () {
+      if (op.kind === "upsert" && op.revision.provenance.reviewedRevisionId) {
+        const selected = current.revisions.find(
+          ({ revision }) => revision.revisionId === op.revision.provenance.reviewedRevisionId,
+        );
+        const conflict = current.item?.status === "quarantined" ? current.item.conflict : undefined;
+        const review = yield* sql<{ review_conflict_id: string }>`
+          SELECT review_conflict_id FROM memory_hub_leases
+          WHERE space=${op.memorySpaceId} AND memory_id=${op.memoryId}
+        `.pipe(
+          Effect.mapError(
+            (cause) => new Store.MemoryStorageError({ stage: "review-conflict", cause }),
+          ),
+        );
+        if (
+          !conflict ||
+          conflict.conflictId !== review[0]?.review_conflict_id ||
+          !selected?.payload ||
+          selected.payload.text !== op.payload.text ||
+          selected.revision.assertionKind !== op.revision.assertionKind ||
+          !Schema.toEquivalence(M.MemoryPayload)(
+            {
+              ...selected.payload,
+              derivedFromMemoryRevisions: op.payload.derivedFromMemoryRevisions,
+            },
+            op.payload,
+          )
+        )
+          return yield* new Store.MemoryStoreConflict({ code: "conflict_changed" });
+      }
       if (
         M.isMemoryRevisionOperation(op) &&
         (op.forgetFence !== undefined || op.revision.provenance.unverified)

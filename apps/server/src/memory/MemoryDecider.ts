@@ -132,7 +132,25 @@ export function decideMemoryOperation(
       : operation.revision;
   if (operation.kind === "revert" && admission.kind === "localIntent")
     fail("unsupported_operation");
-  if (operation.kind === "upsert" && current.heads.length > 1 && sameSet(current.heads, r.parents))
+  if (operation.kind === "upsert" && !replica) {
+    if (r.provenance.reviewedRevisionId !== undefined) {
+      if (
+        !operation.closedLineage ||
+        current.heads.length < 2 ||
+        !sameSet(current.heads, r.parents) ||
+        !current.heads.includes(r.provenance.reviewedRevisionId)
+      )
+        fail("conflict_changed");
+    } else if (current.heads.length > 1 && sameSet(current.heads, r.parents))
+      fail("conflict_changed");
+  }
+  if (
+    replica &&
+    operation.kind === "upsert" &&
+    !r.provenance.reviewedRevisionId &&
+    current.heads.length > 1 &&
+    sameSet(current.heads, r.parents)
+  )
     fail("conflict_changed");
   if (current.identity && JSON.stringify(current.identity.scope) !== JSON.stringify(r.scope))
     fail("identity_mismatch");

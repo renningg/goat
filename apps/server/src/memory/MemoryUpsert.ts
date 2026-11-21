@@ -223,6 +223,15 @@ export const makeUpsert = (deps: {
           current?.revisions.filter((pair) =>
             value.expectedHeads.includes(pair.revision.revisionId),
           ) ?? [];
+        const reviewed = value.reviewedRevisionId;
+        if (
+          reviewed &&
+          (sourceThread ||
+            remember ||
+            acceptance ||
+            !heads.some((head) => head.revision.revisionId === reviewed))
+        )
+          return yield* new Store.MemoryStoreConflict({ code: "conflict_changed" });
         const inherited = new Set(
           heads.flatMap((pair) => pair.payload?.derivedFromMemoryRevisions ?? []),
         );
@@ -303,7 +312,7 @@ export const makeUpsert = (deps: {
           ? undefined
           : (acceptance?.origin ?? (remember ? sourceThread : undefined));
         const wide = payload.derivedFromMemoryRevisions.length > M.MEMORY_DERIVED_REVISIONS_MAX_V1;
-        const authorityFirst = wide || marked || acceptance !== undefined;
+        const authorityFirst = wide || marked || acceptance !== undefined || reviewed !== undefined;
         const forgetFence =
           marked || acceptance
             ? yield* store.readCursor(space, yield* readBoundMemoryHubId(space))
@@ -334,6 +343,7 @@ export const makeUpsert = (deps: {
             provenance: {
               environmentId,
               upsertRequestDigest: requestDigest,
+              ...(reviewed ? { reviewedRevisionId: reviewed } : {}),
               ...(marked ? { unverified: true as const } : {}),
               ...(origin && authorityFirst ? { originThreadId: origin.threadId } : {}),
             },

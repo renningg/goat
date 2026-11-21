@@ -1,3 +1,4 @@
+import { MemoryConflictReview } from "./MemoryConflictReview";
 import { MobileMemoryMoveControl } from "./MemoryMoveControl";
 import { MemoryGeneration, MemoryAgentAccess, useMemoryLifetime } from "./MemoryGenerationSettings";
 import {
@@ -1012,6 +1013,8 @@ function MemoryDetails({
   readonly onClose: () => void;
 }) {
   const registry = useContext(RegistryContext);
+  const config = useAtomValue(serverEnvironment.configValueAtom(params.environmentId));
+  const reviewSupported = config?.environment.capabilities.memory?.conflictReview === true;
   const { savedConnectionsById } = useSavedRemoteConnections();
   const deviceName = (id: EnvironmentId) =>
     savedConnectionsById[id]?.environmentLabel ?? "Unknown device";
@@ -1151,6 +1154,20 @@ function MemoryDetails({
               : ""}
           </Copy>
           <MemoryProvenanceBadge item={item} />
+          {reviewSupported && item.status === "quarantined" ? (
+            <MemoryConflictReview
+              key={item.conflict.conflictId}
+              item={item}
+              environmentId={params.environmentId}
+              canWrite={canWrite && memoryEnabled}
+              deviceName={deviceName}
+              onNotice={setNotice}
+              refresh={() => {
+                registry.refresh(readAtom);
+                registry.refresh(historyAtom);
+              }}
+            />
+          ) : null}
           {item.status === "active" ? (
             <>
               <Copy>{item.payload.text}</Copy>

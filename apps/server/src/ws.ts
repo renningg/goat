@@ -8,7 +8,10 @@ import { mapCheckpointStorageError } from "./vcs/checkpointStorageError.ts";
 import { enrichProjectShells } from "./project/enrichProjectShells.ts";
 import { vcsStatusHandlers } from "./vcs/vcsStatusHandlers.ts";
 import { makeSqlWorktreeHolderLookup, WorktreeHolderGuard } from "./git/WorktreeHolderGuard.ts";
-import { makeMemoryMutationHandlers } from "./memory/MemoryMutationHandlers.ts";
+import {
+  makeMemoryMutationHandlers,
+  personMemoryMutationPermit,
+} from "./memory/MemoryMutationHandlers.ts";
 import { makeGlobalSkillsRpcLayer } from "./skills/GlobalSkillsRpcHandlers.ts";
 import * as AccessRpc from "./auth/AccessRpc.ts";
 import { makeOmittableShellReaders } from "./orchestration-v2/ThreadFamilyLookup.ts";
@@ -1231,7 +1234,14 @@ export const layerWsRpc = (
         [WS_METHODS.memoryRead]: (input) =>
           memory.read(input, memoryRead).pipe(Effect.mapError(memoryError)),
         [WS_METHODS.memoryHistory]: (input) =>
-          memory.history(input, memoryRead).pipe(Effect.mapError(memoryError)),
+          memory
+            .history(
+              input,
+              input.includeConflictVersions
+                ? personMemoryMutationPermit(currentSession, memoryRead)
+                : memoryRead,
+            )
+            .pipe(Effect.mapError(memoryError)),
         [WS_METHODS.memoryHubDiagnostics]: (input) =>
           memorySync.hubDiagnostics(input, memoryRead).pipe(Effect.mapError(memoryError)),
         [WS_METHODS.memorySyncStatus]: (input) =>

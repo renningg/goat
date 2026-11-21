@@ -367,6 +367,7 @@ export const MemoryProvenance = struct({
   unverified: Schema.optionalKey(Schema.Literal(true)),
   originThreadId: Schema.optionalKey(ThreadId),
   // Body-free identity of the original explicit upsert request and its caller.
+  reviewedRevisionId: Schema.optionalKey(MemoryRevisionId),
   upsertRequestDigest: Schema.optionalKey(
     Schema.String.check(Schema.makeFilter((s) => /^[a-f0-9]{64}$/.test(s))),
   ),
@@ -1466,6 +1467,7 @@ export const MemoryHistoryPage = bounded(
   struct({
     memoryId: MemoryId,
     revisions: array(projectedRevisionPair),
+    conflictVersions: Schema.optionalKey(array(projectedRevisionPair)),
     /** Selected resolution inputs retained on the server, including bodies too large to preview. */
     restorableRevisionIds: Schema.optionalKey(distinct(MemoryRevisionId)),
     resolutions: array(resolutionPair),
@@ -1679,6 +1681,7 @@ export const MemoryHistoryInput = struct({
   ...space,
   ...paging,
   memoryId: MemoryId,
+  includeConflictVersions: Schema.optionalKey(Schema.Literal(true)),
   /** Send only when the environment advertises memory.refusedReverts. */
   includeRefusedReverts: Schema.optionalKey(Schema.Literal(true)),
   /** Page retained originals independently of ordinary history. */
@@ -1710,6 +1713,7 @@ const mutation = {
 const detailedFailure = { includeFailureDetails: Schema.optionalKey(Schema.Literal(true)) };
 const upsertInput = {
   ...mutation,
+  reviewedRevisionId: Schema.optionalKey(MemoryRevisionId),
   scope: MemoryScope,
   assertionKind: MemoryAssertionKind,
   payload: MemoryPayload,

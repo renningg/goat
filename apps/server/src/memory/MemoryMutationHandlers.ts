@@ -14,7 +14,7 @@ import { canResolveHumanStep, sessionResolver } from "../handoffs/HumanStepAutho
 import { MemoryAccessError, type MemoryService } from "./MemoryService.ts";
 import * as Schema from "effect/Schema";
 
-const personMemorySuggestionPermit = (
+export const personMemoryMutationPermit = (
   session: Parameters<typeof sessionResolver>[0],
   permit: Effect.Effect<void, MemoryAccessError>,
 ) =>
@@ -39,14 +39,14 @@ export const makeMemoryMutationHandlers = (
   read: Effect.Effect<void, MemoryAccessError>,
   write: Effect.Effect<void, MemoryAccessError>,
 ) => {
-  const readPermit = personMemorySuggestionPermit(session, read);
-  const writePermit = personMemorySuggestionPermit(session, write);
+  const readPermit = personMemoryMutationPermit(session, read);
+  const writePermit = personMemoryMutationPermit(session, write);
   return {
     [WS_METHODS.memoryUpsert]: ({
       includeFailureDetails,
       ...input
     }: typeof MemoryUpsertRpcInput.Type) =>
-      memory.upsert(input, write).pipe(
+      memory.upsert(input, input.reviewedRevisionId ? writePermit : write).pipe(
         Effect.flatMap((stored) => decodeReceipt(stored.receipt)),
         Effect.map(includeFailureDetails ? (receipt) => receipt : legacyReceipt),
         Effect.mapError(includeFailureDetails ? memoryError : memoryLegacyError),
