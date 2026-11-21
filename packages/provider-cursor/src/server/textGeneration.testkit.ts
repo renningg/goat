@@ -2,7 +2,7 @@ import { assert } from "@effect/vitest";
 import * as M from "@goat/contracts";
 import { ProviderInstanceId, type TextGenerationError } from "@goat/contracts";
 import { createModelSelection } from "@goat/shared/model";
-import type * as Effect from "effect/Effect";
+import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type { makeCursorTextGeneration } from "./textGeneration.ts";
 
@@ -89,7 +89,12 @@ export const runMemory = (
 > => {
   if (operation === "resolveMemoryConflict") {
     assert.isDefined(generation.resolveMemoryConflict);
-    return generation.resolveMemoryConflict({ ...memoryConflict, modelSelection: selection });
+    return generation.resolveMemoryConflict({ ...memoryConflict, modelSelection: selection }).pipe(
+      Effect.map((output) => ({
+        ...output,
+        result: "outcome" in output.result ? null : output.result,
+      })),
+    );
   }
   assert.isDefined(generation.generateMemorySummary);
   return generation.generateMemorySummary({ ...memorySummary, modelSelection: selection });
