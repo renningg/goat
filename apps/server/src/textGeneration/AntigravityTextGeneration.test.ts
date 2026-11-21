@@ -14,6 +14,8 @@ import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 
+type MemoryOutcome = M.GenerateMemorySummaryOutcome | M.ResolveMemoryConflictExecutionResult;
+
 import { type AcpError, AcpRequestError } from "effect-acp/errors";
 import type * as AcpSchema from "effect-acp/compat";
 import { expect } from "vite-plus/test";
@@ -373,7 +375,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
             ? fixture.textGeneration.resolveMemoryConflict!({
                 ...memoryConflict,
                 modelSelection: selection,
-              }).pipe(Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome))
+              }).pipe(Effect.map((outcome): MemoryOutcome => outcome))
             : fixture.textGeneration.generateMemorySummary!({
                 ...memorySummary,
                 modelSelection: selection,
@@ -430,7 +432,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
             ? fixture.textGeneration.resolveMemoryConflict!({
                 ...memoryConflict,
                 modelSelection: selection,
-              }).pipe(Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome))
+              }).pipe(Effect.map((outcome): MemoryOutcome => outcome))
             : fixture.textGeneration.generateMemorySummary!({
                 ...memorySummary,
                 modelSelection: selection,
@@ -452,7 +454,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
         const error = yield* (
           operation === "resolveMemoryConflict"
             ? fixture.textGeneration.resolveMemoryConflict!(memoryConflict).pipe(
-                Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                Effect.map((outcome): MemoryOutcome => outcome),
               )
             : fixture.textGeneration.generateMemorySummary!(memorySummary)
         ).pipe(Effect.flip);
@@ -486,7 +488,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
         const error = yield* (
           operation === "resolveMemoryConflict"
             ? fixture.textGeneration.resolveMemoryConflict!(memoryConflict).pipe(
-                Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                Effect.map((outcome): MemoryOutcome => outcome),
               )
             : fixture.textGeneration.generateMemorySummary!(memorySummary)
         ).pipe(Effect.flip);
@@ -555,7 +557,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
         const exit = yield* Effect.exit(
           operation === "resolveMemoryConflict"
             ? fixture.textGeneration.resolveMemoryConflict!(memoryConflict).pipe(
-                Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                Effect.map((outcome): MemoryOutcome => outcome),
               )
             : fixture.textGeneration.generateMemorySummary!(memorySummary),
         );
@@ -587,7 +589,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
       const exit = yield* Effect.exit(
         operation === "resolveMemoryConflict"
           ? fixture.textGeneration.resolveMemoryConflict!(memoryConflict).pipe(
-              Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+              Effect.map((outcome): MemoryOutcome => outcome),
             )
           : fixture.textGeneration.generateMemorySummary!(memorySummary),
       );
@@ -612,7 +614,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
         const exit = yield* Effect.exit(
           operation === "resolveMemoryConflict"
             ? fixture.textGeneration.resolveMemoryConflict!(memoryConflict).pipe(
-                Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                Effect.map((outcome): MemoryOutcome => outcome),
               )
             : fixture.textGeneration.generateMemorySummary!(memorySummary),
         );
@@ -633,7 +635,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
         const exit = yield* Effect.exit(
           operation === "resolveMemoryConflict"
             ? fixture.textGeneration.resolveMemoryConflict!(memoryConflict).pipe(
-                Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                Effect.map((outcome): MemoryOutcome => outcome),
               )
             : fixture.textGeneration.generateMemorySummary!(memorySummary),
         );

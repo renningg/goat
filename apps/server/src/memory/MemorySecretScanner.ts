@@ -69,7 +69,12 @@ export const redactMemoryText = <T extends { readonly text: string; readonly jud
 
 /** A summary or resolution generation whose result, when present, is passed through {@link redactMemoryText}. */
 export const redacted = <
-  O extends { readonly result: Parameters<typeof redactMemoryText>[0] | null },
+  O extends {
+    readonly result:
+      | Parameters<typeof redactMemoryText>[0]
+      | { readonly outcome: "needs_review" }
+      | null;
+  },
   E,
   R,
 >(
@@ -77,5 +82,8 @@ export const redacted = <
 ): Effect.Effect<O, E, R> =>
   Effect.map(generation, (output) => ({
     ...output,
-    result: output.result === null ? null : redactMemoryText(output.result),
+    result:
+      output.result !== null && "text" in output.result
+        ? redactMemoryText(output.result)
+        : output.result,
   }));

@@ -184,6 +184,7 @@ import Migration0167 from "./Migrations/167_QueuedTurnInputIndexJsonValid.ts";
 import Migration0168 from "./Migrations/168_TurnItemMessageOrdinalIndex.ts";
 import Migration0169 from "./Migrations/169_TurnItemInlineWorkOutput.ts";
 import Migration0170 from "./Migrations/170_RepairStaleTitleRegeneration.ts";
+import Migration0171 from "./Migrations/171_MemoryConflictReview.ts";
 import Migration0175 from "./Migrations/175_AcpSessionOwnerIndex.ts";
 import Migration0176 from "./Migrations/176_ChannelWorkerLaunchHeads.ts";
 import Migration0177 from "./Migrations/177_WorkTriggerAuthorityFence.ts";
@@ -367,6 +368,7 @@ export const migrationEntries = [
   [168, "TurnItemMessageOrdinalIndex", Migration0168],
   [169, "TurnItemInlineWorkOutput", Migration0169],
   [170, "RepairStaleTitleRegeneration", Migration0170],
+  [171, "MemoryConflictReview", Migration0171],
   [175, "AcpSessionOwnerIndex", Migration0175],
   [176, "ChannelWorkerLaunchHeads", Migration0176],
   [177, WORK_TRIGGER_FENCE_MIGRATION_NAME, Migration0177],

@@ -268,6 +268,7 @@ export const makeHubWrite = (
       "hub-lease",
       sql<{
         highest_token: number;
+        review_conflict_id: string | null;
         lease_json: string | null;
       }>`SELECT * FROM memory_hub_leases WHERE space=${space} AND memory_id=${memoryId}`,
     );
@@ -285,6 +286,8 @@ export const makeHubWrite = (
       if (r.memorySpaceId !== space || r.holderEnvironmentId !== member.environmentId)
         return yield* new M.MemoryHubForbiddenError({});
       if (action.kind === "claim") {
+        if (rows[0]?.review_conflict_id === r.conflictId)
+          return yield* new M.MemoryHubError({ code: "needs_review" });
         const requestDigest = hashText(yield* claimCodec.encode(action.request));
         const attempts = yield* stored(
           "hub-attempt-replay",
@@ -376,6 +379,20 @@ export const makeHubWrite = (
           lease.fencingToken !== action.request.fencingToken
         )
           return yield* new M.MemoryHubError({ code: "fenced" });
+        if (action.kind === "release" && action.request.needsReview) {
+          if (Date.parse(lease.expiresAtHubTime) <= now)
+            return yield* new M.MemoryHubError({ code: "lease_expired" });
+          if (
+            current.tombstone ||
+            current.pendingForget ||
+            !sameHeadSet(current.heads, lease.conflictHeadSet)
+          )
+            return yield* new M.MemoryHubError({ code: "conflict_changed" });
+          yield* stored(
+            "hub-review-conflict",
+            sql`UPDATE memory_hub_leases SET review_conflict_id=${lease.conflictId} WHERE space=${space} AND memory_id=${memoryId}`,
+          );
+        }
         if (action.kind === "renew") {
           if (
             Date.parse(lease.expiresAtHubTime) <= now ||

@@ -12,6 +12,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import { expect } from "vite-plus/test";
 
+type MemoryOutcome = M.GenerateMemorySummaryOutcome | M.ResolveMemoryConflictExecutionResult;
+
 import {
   SYNTHETIC_CLAUDE_CAPABLE_MODEL,
   SYNTHETIC_CLAUDE_COLLIDING_ALIAS,
@@ -267,7 +269,7 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
             const failure = yield* Effect.flip(
               operation === "resolveMemoryConflict"
                 ? generation.resolveMemoryConflict!(memoryConflict).pipe(
-                    Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                    Effect.map((outcome): MemoryOutcome => outcome),
                   )
                 : generation.generateMemorySummary!(memorySummary),
             );
@@ -317,7 +319,9 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
               ? yield* generation.resolveMemoryConflict!(memoryConflict)
               : yield* generation.generateMemorySummary!(memorySummary);
           expect(generated.result).not.toBeNull();
-          expect(generated.result?.text).toBe(memoryOutput.text);
+          expect(
+            generated.result && "text" in generated.result ? generated.result.text : undefined,
+          ).toBe(memoryOutput.text);
         }),
     ),
   );
@@ -422,7 +426,7 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
           const failure = yield* Effect.flip(
             operation === "resolveMemoryConflict"
               ? generation.resolveMemoryConflict!(memoryConflict).pipe(
-                  Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                  Effect.map((outcome): MemoryOutcome => outcome),
                 )
               : generation.generateMemorySummary!(memorySummary),
           );
@@ -454,7 +458,9 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
               ? yield* generation.resolveMemoryConflict!(memoryConflict)
               : yield* generation.generateMemorySummary!(memorySummary);
           expect(result.result).not.toBeNull();
-          expect(result.result?.text).toBe(memoryOutput.text);
+          expect(result.result && "text" in result.result ? result.result.text : undefined).toBe(
+            memoryOutput.text,
+          );
         }),
     ),
   );
@@ -515,7 +521,9 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
               ? yield* generation.resolveMemoryConflict!(memoryConflict)
               : yield* generation.generateMemorySummary!(memorySummary);
           expect(generated.result).not.toBeNull();
-          expect(generated.result?.text).toBe(memoryOutput.text);
+          expect(
+            generated.result && "text" in generated.result ? generated.result.text : undefined,
+          ).toBe(memoryOutput.text);
           expect(generated.execution).toEqual({
             requestedModelSelection: memorySelection,
             effectiveModel: `${SYNTHETIC_CLAUDE_STANDARD_MODEL}[expanded]`,
@@ -631,7 +639,7 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
           const failure = yield* Effect.flip(
             operation === "resolveMemoryConflict"
               ? generation.resolveMemoryConflict!(memoryConflict).pipe(
-                  Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                  Effect.map((outcome): MemoryOutcome => outcome),
                 )
               : generation.generateMemorySummary!(memorySummary),
           );
@@ -667,7 +675,9 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
                 ? yield* generation.resolveMemoryConflict!(memoryConflict)
                 : yield* generation.generateMemorySummary!(memorySummary);
             expect(result.result).not.toBeNull();
-            expect(result.result?.text).toBe(memoryOutput.text);
+            expect(result.result && "text" in result.result ? result.result.text : undefined).toBe(
+              memoryOutput.text,
+            );
           }),
       ),
   );
@@ -741,13 +751,15 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
           const run =
             operation === "resolveMemoryConflict"
               ? generation.resolveMemoryConflict!(memoryConflict).pipe(
-                  Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                  Effect.map((outcome): MemoryOutcome => outcome),
                 )
               : generation.generateMemorySummary!(memorySummary);
           if (scenario === "round trip") {
             const generated = yield* run;
             expect(generated.result).not.toBeNull();
-            expect(generated.result?.text).toBe(memoryOutput.text);
+            expect(
+              generated.result && "text" in generated.result ? generated.result.text : undefined,
+            ).toBe(memoryOutput.text);
           } else {
             expect((yield* Effect.flip(run)).cause).toMatchObject({ code: "invalid_output" });
           }
@@ -771,7 +783,7 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
           const exit = yield* Effect.exit(
             operation === "resolveMemoryConflict"
               ? generation.resolveMemoryConflict!(memoryConflict).pipe(
-                  Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                  Effect.map((outcome): MemoryOutcome => outcome),
                 )
               : generation.generateMemorySummary!(memorySummary),
           );
@@ -789,7 +801,7 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
             const exit = yield* Effect.exit(
               operation === "resolveMemoryConflict"
                 ? generation.resolveMemoryConflict!(memoryConflict).pipe(
-                    Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                    Effect.map((outcome): MemoryOutcome => outcome),
                   )
                 : generation.generateMemorySummary!(memorySummary),
             );

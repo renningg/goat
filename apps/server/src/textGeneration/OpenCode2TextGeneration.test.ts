@@ -16,6 +16,8 @@ import * as TestClock from "effect/testing/TestClock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+type MemoryOutcome = M.GenerateMemorySummaryOutcome | M.ResolveMemoryConflictExecutionResult;
+
 import * as ProviderHost from "@goat/provider-core/server/ProviderHost";
 import * as TestProviderHost from "@goat/provider-testing/TestProviderHost";
 import * as OpenCode2AdapterV2Testkit from "../orchestration-v2/Adapters/OpenCode2AdapterV2.testkit.ts";
@@ -300,7 +302,7 @@ it.layer(layer)("OpenCode v2 memory generation", (it) => {
         const failure = yield* Effect.flip(
           operation === "resolveMemoryConflict"
             ? textGeneration.resolveMemoryConflict!(memoryConflict).pipe(
-                Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                Effect.map((outcome): MemoryOutcome => outcome),
               )
             : textGeneration.generateMemorySummary!(memorySummary),
         );
@@ -332,7 +334,7 @@ it.layer(layer)("OpenCode v2 memory generation", (it) => {
           Effect.flip(
             operation === "resolveMemoryConflict"
               ? textGeneration.resolveMemoryConflict!(memoryConflict).pipe(
-                  Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                  Effect.map((outcome): MemoryOutcome => outcome),
                 )
               : textGeneration.generateMemorySummary!(memorySummary),
           );
@@ -479,7 +481,7 @@ it.layer(layer)("OpenCode v2 memory generation", (it) => {
   ) =>
     operation === "resolveMemoryConflict"
       ? generation.resolveMemoryConflict!(memoryConflict).pipe(
-          Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+          Effect.map((outcome): MemoryOutcome => outcome),
         )
       : generation.generateMemorySummary!(memorySummary);
   it.effect.each([false, true])(
@@ -531,7 +533,10 @@ it.layer(layer)("OpenCode v2 memory generation", (it) => {
       assert.deepEqual(yield* generation.memoryCapabilities, { summary: true, conflict: true });
       const result = yield* invoke(generation, operation);
       assert.isNotNull(result.result);
-      assert.equal(result.result?.text, output.text);
+      assert.equal(
+        result.result && "text" in result.result ? result.result.text : undefined,
+        output.text,
+      );
       assert.deepEqual(result.execution, {
         requestedModelSelection: memorySelection,
         effectiveModel: "openai/gpt-5",

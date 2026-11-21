@@ -438,7 +438,7 @@ const make = Effect.gen(function* () {
   const selfFeatures = memoryFloorAdvertisement(yield* MemoryFloor2Enabled);
   const callPull = (r: Route, i: M.MemoryHubPullInput) =>
     r.connection ? client.pull(r.connection, i) : hub.pull({ ...i, ...selfFeatures }, r.principal!);
-  const release = (r: Route, ticket: M.MemoryResolutionLease) => {
+  const release = (r: Route, ticket: M.MemoryResolutionLease, needsReview = false) => {
     const input: M.MemoryHubReleaseInput = {
       protocolVersion: 1,
       memorySpaceId: ticket.memorySpaceId,
@@ -447,6 +447,7 @@ const make = Effect.gen(function* () {
       holderEnvironmentId: local,
       attemptId: ticket.attemptId,
       fencingToken: ticket.fencingToken,
+      ...(needsReview ? { needsReview: true as const } : {}),
     };
     return (
       r.connection
@@ -461,7 +462,7 @@ const make = Effect.gen(function* () {
       // The client raises the same code locally once settings no longer bind this connection,
       // which proves nothing about the lease.
       Effect.catch((error) =>
-        error._tag === "MemoryHubError" && error.code === "fenced"
+        !needsReview && error._tag === "MemoryHubError" && error.code === "fenced"
           ? readSettings.pipe(
               Effect.map((current) =>
                 r.connection
@@ -516,6 +517,7 @@ const make = Effect.gen(function* () {
     let renewalFailed = false;
     let authoritativeExpiry = Date.parse(initial.ticket.expiresAtHubTime);
     let definitiveFailure = false;
+    let reviewReleased = false;
     let generationAttempted = false;
     let failureRecorded = false;
     const transition = Effect.fnUntraced(function* (
@@ -741,13 +743,20 @@ const make = Effect.gen(function* () {
           trusted.execution.environmentId !== local ||
           selectionKey(trusted.execution.requestedModelSelection) !==
             selectionKey(row.ticket.frozenDefaultModelSelection) ||
-          !M.validateMemoryGenerationResult(input, trusted.result) ||
+          (!("outcome" in trusted.result) &&
+            !M.validateMemoryGenerationResult(input, trusted.result)) ||
           scanMemoryValue(trusted.result).kind !== "allowed"
         )
           return yield* new M.MemoryHubError({ code: "invalid_output" });
         yield* ensureEpoch(r.settings.memoryHubVersion);
         yield* eligibility(row.ticket);
         const now = yield* Clock.currentTimeMillis;
+        if ("outcome" in trusted.result) {
+          reviewReleased = yield* release(r, row.ticket, true);
+          if (!reviewReleased) return yield* new M.MemoryHubError({ code: "generation_failed" });
+          definitiveFailure = true;
+          return;
+        }
         const operationId = M.MemoryOperationId.make(stableId(row.ticket.attemptId, "operation"));
         const revisionId = M.MemoryRevisionId.make(stableId(row.ticket.attemptId, "revision"));
         const resolutionId = M.MemoryResolutionId.make(
@@ -912,7 +921,7 @@ const make = Effect.gen(function* () {
       ),
       Effect.ensuring(
         Effect.gen(function* () {
-          const released = yield* release(r, row.ticket);
+          const released = reviewReleased || (yield* release(r, row.ticket));
           if (failureRecorded) return;
           if (row.state !== "terminal") {
             if (definitiveFailure && released) {
@@ -1191,7 +1200,7 @@ const make = Effect.gen(function* () {
           if (
             prepared.value &&
             attempt.failure._tag === "MemoryHubError" &&
-            ["conflict_changed", "lease_expired", "lease_required"].includes(code)
+            ["conflict_changed", "lease_expired", "lease_required", "needs_review"].includes(code)
           ) {
             const retired = yield* store.transact(
               store.retireFrozenClaimTx({

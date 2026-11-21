@@ -230,6 +230,7 @@ export const MemoryFailureCode = Schema.Literals([
   "lease_expired",
   "fenced",
   "claim_busy",
+  "needs_review",
   "invalid_output",
   "generation_failed",
   "secret_detected",
@@ -2282,7 +2283,10 @@ export const MemoryGenerationExecution = struct({
 export type MemoryGenerationExecution = typeof MemoryGenerationExecution.Type;
 
 export const ResolveMemoryConflictExecutionResult = struct({
-  result: ResolveMemoryConflictResult,
+  result: Schema.Union([
+    ResolveMemoryConflictResult,
+    struct({ outcome: Schema.Literal("needs_review") }),
+  ]),
   execution: MemoryGenerationExecution,
 });
 export type ResolveMemoryConflictExecutionResult = typeof ResolveMemoryConflictExecutionResult.Type;
@@ -2791,7 +2795,11 @@ export type MemoryHubClaimInput = typeof MemoryHubClaimInput.Type;
 export const MemoryHubRenewInput = struct({ ...leaseKey, fencingToken: PositiveInt });
 export type MemoryHubRenewInput = typeof MemoryHubRenewInput.Type;
 
-export const MemoryHubReleaseInput = struct({ ...leaseKey, fencingToken: PositiveInt });
+export const MemoryHubReleaseInput = struct({
+  ...leaseKey,
+  fencingToken: PositiveInt,
+  needsReview: Schema.optionalKey(Schema.Literal(true)),
+});
 export type MemoryHubReleaseInput = typeof MemoryHubReleaseInput.Type;
 
 export const MemoryHubReleaseResult = struct({ released: Schema.Boolean });

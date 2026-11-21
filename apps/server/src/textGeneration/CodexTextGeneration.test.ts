@@ -27,6 +27,8 @@ import {
   withFakeCodexEnv,
 } from "./codexTextGenerationFake.testkit.ts";
 
+type MemoryOutcome = M.GenerateMemorySummaryOutcome | M.ResolveMemoryConflictExecutionResult;
+
 const memorySelection = M.MemoryModelSelection.make({
   instanceId: M.ProviderInstanceId.make("codex"),
   model: "gpt-5.6-luna",
@@ -168,7 +170,9 @@ it.layer(layerCodexTextGenerationTest)("CodexTextGeneration", (it) => {
                 ? yield* generation.resolveMemoryConflict!(memoryConflict)
                 : yield* generation.generateMemorySummary!(memorySummary);
             expect(generated.result).not.toBeNull();
-            expect(generated.result?.text).toBe(memoryOutput.text);
+            expect(
+              generated.result && "text" in generated.result ? generated.result.text : undefined,
+            ).toBe(memoryOutput.text);
             expect(generated.execution).toEqual({
               requestedModelSelection: memorySelection,
               effectiveModel: "openai.gpt-5.6-luna",
@@ -227,7 +231,7 @@ it.layer(layerCodexTextGenerationTest)("CodexTextGeneration", (it) => {
           const exit = yield* Effect.exit(
             operation === "resolveMemoryConflict"
               ? generation.resolveMemoryConflict!(memoryConflict).pipe(
-                  Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                  Effect.map((outcome): MemoryOutcome => outcome),
                 )
               : generation.generateMemorySummary!(memorySummary),
           );
@@ -266,7 +270,7 @@ it.layer(layerCodexTextGenerationTest)("CodexTextGeneration", (it) => {
         const error = yield* (
           operation === "resolveMemoryConflict"
             ? generation.resolveMemoryConflict!(memoryConflict).pipe(
-                Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                Effect.map((outcome): MemoryOutcome => outcome),
               )
             : generation.generateMemorySummary!(memorySummary)
         ).pipe(Effect.flip);
@@ -291,7 +295,7 @@ it.layer(layerCodexTextGenerationTest)("CodexTextGeneration", (it) => {
             const exit = yield* Effect.exit(
               operation === "resolveMemoryConflict"
                 ? generation.resolveMemoryConflict!(memoryConflict).pipe(
-                    Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                    Effect.map((outcome): MemoryOutcome => outcome),
                   )
                 : generation.generateMemorySummary!(memorySummary),
             );

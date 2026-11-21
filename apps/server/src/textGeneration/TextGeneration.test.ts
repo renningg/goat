@@ -174,9 +174,13 @@ describe("TextGeneration memory routing", () => {
         const summary = yield* generation.generateMemorySummary!(fixture.summary);
         const conflict = yield* generation.resolveMemoryConflict!(fixture.conflict);
         expect(summary.result).not.toBeNull();
-        expect(summary.result?.text).toBe(fixture.name);
+        expect(summary.result && "text" in summary.result ? summary.result.text : undefined).toBe(
+          fixture.name,
+        );
         expect(conflict.result).not.toBeNull();
-        expect(conflict.result?.text).toBe(fixture.name);
+        expect(
+          conflict.result && "text" in conflict.result ? conflict.result.text : undefined,
+        ).toBe(fixture.name);
         expect(summary.execution).toBe(fixture.execution);
         expect(conflict.execution).toBe(fixture.execution);
       }

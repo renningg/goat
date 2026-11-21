@@ -157,7 +157,13 @@ function memoryOperations(name: string, runMemory: MemoryRunner) {
       const result = yield* decodeMemoryConflictExecution(
         {
           ...generated,
-          result: memoryResultFromModelOutput(generated.result, memoryEvidenceSources(input)),
+          result:
+            generated.result.text === null
+              ? { outcome: "needs_review" }
+              : memoryResultFromModelOutput(
+                  { ...generated.result, text: generated.result.text },
+                  memoryEvidenceSources(input),
+                ),
         },
         { onExcessProperty: "error" },
       ).pipe(
@@ -171,7 +177,7 @@ function memoryOperations(name: string, runMemory: MemoryRunner) {
         ),
       );
       if (
-        !validateMemoryGenerationResult(input, result.result) ||
+        (!("outcome" in result.result) && !validateMemoryGenerationResult(input, result.result)) ||
         result.execution.providerInstanceId !== input.modelSelection.instanceId ||
         !sameMemorySelection(result.execution.requestedModelSelection, input.modelSelection)
       )

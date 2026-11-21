@@ -84,46 +84,51 @@ describe("memory shared operations", () => {
           }),
       ),
     );
-  it.effect("memory operations omit investigation and attachments", () =>
-    Effect.gen(function* () {
-      const seen: string[] = [];
-      const selected: MemorySelectedRunner = (request) => {
-        expect(request.attachments).toBeUndefined();
-        expect(request.investigate).toBeUndefined();
-        seen.push(request.operation);
-        return Schema.decodeUnknownEffect(request.outputSchema)(
-          request.operation === "resolveMemoryConflict"
-            ? { ...result, judgment: "Synthetic judgment" }
-            : { summary: result },
-        ).pipe(
-          Effect.map((result) => ({ result, effectiveModel: "effective" })),
-          Effect.mapError(
-            (cause) =>
-              new M.TextGenerationError({
-                operation: request.operation,
-                detail: "Fixture decode failed.",
-                cause,
-              }),
-          ),
+  it.effect.each([false, true])(
+    "memory operations omit investigation and attachments (review=%s)",
+    (review) =>
+      Effect.gen(function* () {
+        const seen: string[] = [];
+        const selected: MemorySelectedRunner = (request) => {
+          expect(request.attachments).toBeUndefined();
+          expect(request.investigate).toBeUndefined();
+          seen.push(request.operation);
+          return Schema.decodeUnknownEffect(request.outputSchema)(
+            request.operation === "resolveMemoryConflict"
+              ? { ...result, ...(review ? { text: null } : {}), judgment: "Synthetic judgment" }
+              : { summary: result },
+          ).pipe(
+            Effect.map((result) => ({ result, effectiveModel: "effective" })),
+            Effect.mapError(
+              (cause) =>
+                new M.TextGenerationError({
+                  operation: request.operation,
+                  detail: "Fixture decode failed.",
+                  cause,
+                }),
+            ),
+          );
+        };
+        const provider = fromRunner("fixture", legacy, {
+          memory: {
+            capabilities: Effect.succeed({ summary: true, conflict: true }),
+            run: withMemoryExecution(
+              {
+                providerInstanceId: selection.instanceId,
+                environmentId: M.EnvironmentId.make("owner"),
+              },
+              M.ProviderDriverKind.make("codex"),
+              selected,
+            ),
+          },
+        });
+        const decision = yield* provider.resolveMemoryConflict!(conflict);
+        expect(decision.result).toMatchObject(
+          review ? { outcome: "needs_review" } : { text: result.text },
         );
-      };
-      const provider = fromRunner("fixture", legacy, {
-        memory: {
-          capabilities: Effect.succeed({ summary: true, conflict: true }),
-          run: withMemoryExecution(
-            {
-              providerInstanceId: selection.instanceId,
-              environmentId: M.EnvironmentId.make("owner"),
-            },
-            M.ProviderDriverKind.make("codex"),
-            selected,
-          ),
-        },
-      });
-      yield* provider.resolveMemoryConflict!(conflict);
-      yield* provider.generateMemorySummary!(summary);
-      expect(seen).toEqual(["resolveMemoryConflict", "generateMemorySummary"]);
-    }),
+        yield* provider.generateMemorySummary!(summary);
+        expect(seen).toEqual(["resolveMemoryConflict", "generateMemorySummary"]);
+      }),
   );
   it.effect("decodes both memory result schemas", () =>
     Effect.gen(function* () {

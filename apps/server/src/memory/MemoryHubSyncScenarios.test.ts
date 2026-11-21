@@ -56,7 +56,11 @@ import { layerTestLoopback } from "@goat/shared/testing/loopbackHttpServer";
 const id = (n: number) =>
   M.MemoryOperationId.make(`00000000-0000-4000-8000-${String(n).padStart(12, "0")}`);
 
-type Resolve = NonNullable<Generation.TextGeneration["Service"]["resolveMemoryConflict"]>;
+type ResolveConflict = NonNullable<Generation.TextGeneration["Service"]["resolveMemoryConflict"]>;
+type Resolve = (
+  request: Parameters<ResolveConflict>[0],
+  environmentId: M.EnvironmentId,
+) => ReturnType<ResolveConflict>;
 // The only double is the provider instance returned by this driver. Registry,
 // TextGeneration routing, storage, HTTP and Sync all run their production code.
 const environment = (label: "H" | "A" | "B", resolve?: Resolve) =>
@@ -178,7 +182,7 @@ const environment = (label: "H" | "A" | "B", resolve?: Resolve) =>
               Effect.gen(function* () {
                 generated++;
                 yield* Deferred.succeed(entered, request);
-                if (resolve) return yield* resolve(request);
+                if (resolve) return yield* resolve(request, environmentId);
                 return {
                   result: {
                     text: "resolved synthetic fact",
@@ -788,6 +792,67 @@ it.effect(
       assert.strictEqual(c.a.generated(), 0);
       yield* c.b.sync.shutdown;
     }).pipe(Effect.provide(NodeServices.layer)),
+);
+
+it.effect("keeps pnpm and yarn quarantined when the model requests review", () =>
+  Effect.gen(function* () {
+    const c = yield* cluster((input, environmentId) =>
+      Effect.succeed({
+        result: { outcome: "needs_review" as const },
+        execution: {
+          requestedModelSelection: input.modelSelection,
+          effectiveProvider: M.ProviderDriverKind.make("codex"),
+          effectiveModel: input.modelSelection.model,
+          providerInstanceId: input.modelSelection.instanceId,
+          environmentId,
+        },
+      }),
+    );
+    const target = memory(34);
+    const heads = yield* common(c, target);
+    yield* write(c.a, c.space, target, 1140, "The project uses pnpm.", heads);
+    yield* write(c.b, c.space, target, 1141, "The project uses yarn.", heads);
+    yield* c.a.tick;
+    yield* c.b.tick;
+    const input = yield* Deferred.await(c.b.entered);
+    assert.deepStrictEqual(input.heads.map(({ payload }) => payload.text).sort(), [
+      "The project uses pnpm.",
+      "The project uses yarn.",
+    ]);
+    assert.strictEqual(yield* Deferred.await(c.b.released), target);
+    yield* c.b.worker.drain;
+    yield* c.a.tick;
+    yield* c.b.tick;
+    const hub = yield* c.h.aggregate(c.space, target);
+    assert.notStrictEqual(hub.item?.status, "active");
+    assert.strictEqual(hub.fence?.activeLease, null);
+    for (const replica of [c.a, c.h, c.b]) {
+      const aggregate = yield* replica.aggregate(c.space, target);
+      assert.notStrictEqual(aggregate.item?.status, "active");
+      assert.strictEqual(aggregate.heads.length, 2);
+      assert.strictEqual(aggregate.resolutions.length, 0);
+    }
+    const connection = yield* c.a.connection;
+    const refusal = yield* c.a.run(
+      Client.MemoryHubClient.use((client) =>
+        Effect.flip(
+          client.claim(connection, {
+            protocolVersion: 1,
+            memorySpaceId: c.space,
+            memoryId: target,
+            conflictId: hub.conflicts[0]!.conflictId,
+            conflictHeadSet: [...hub.heads].sort(),
+            holderEnvironmentId: c.a.identity,
+            attemptId: M.MemoryOperationId.make(id(1142)),
+            frozenDefaultModelSelection: c.a.selection,
+          }),
+        ),
+      ),
+    );
+    assert.strictEqual(refusal._tag, "MemoryHubError");
+    assert.strictEqual(refusal._tag === "MemoryHubError" && refusal.code, "needs_review");
+    assert.strictEqual(c.a.generated() + c.h.generated() + c.b.generated(), 1);
+  }).pipe(Effect.provide(NodeServices.layer)),
 );
 
 it.effect(

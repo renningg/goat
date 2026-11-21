@@ -6,6 +6,8 @@ import * as NodeReadline from "node:readline";
 import * as NodeURL from "node:url";
 import * as NodeFS from "node:fs";
 
+type MemoryOutcome = M.GenerateMemorySummaryOutcome | M.ResolveMemoryConflictExecutionResult;
+
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
@@ -414,7 +416,13 @@ it.layer(layerGrokTextGenerationTest)("Grok memory generation", (it) => {
               const failure = yield* Effect.flip(
                 operation === "resolveMemoryConflict"
                   ? textGeneration.resolveMemoryConflict!(memoryConflict).pipe(
-                      Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                      Effect.map(
+                        (
+                          outcome,
+                        ):
+                          | M.GenerateMemorySummaryOutcome
+                          | M.ResolveMemoryConflictExecutionResult => outcome,
+                      ),
                     )
                   : textGeneration.generateMemorySummary!(memorySummary),
               );
@@ -441,11 +449,13 @@ it.layer(layerGrokTextGenerationTest)("Grok memory generation", (it) => {
         Effect.gen(function* () {
           const result = yield* operation === "resolveMemoryConflict"
             ? generation.resolveMemoryConflict!(memoryConflict).pipe(
-                Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                Effect.map((outcome): MemoryOutcome => outcome),
               )
             : generation.generateMemorySummary!(memorySummary);
           expect(result.result).not.toBeNull();
-          expect(result.result?.text).toBe(output.text);
+          expect(result.result && "text" in result.result ? result.result.text : undefined).toBe(
+            output.text,
+          );
           expect(result.execution).toEqual({
             requestedModelSelection: memorySelection,
             effectiveModel: "grok-mock-default",
@@ -472,7 +482,9 @@ it.layer(layerGrokTextGenerationTest)("Grok memory generation", (it) => {
             operation === "resolveMemoryConflict"
               ? yield* generation.resolveMemoryConflict(memoryConflict)
               : yield* generation.generateMemorySummary(memorySummary);
-          expect(result.result?.text).toBe(output.text);
+          expect(result.result && "text" in result.result ? result.result.text : undefined).toBe(
+            output.text,
+          );
         }),
       memoryContext,
       [NodePath.dirname(process.execPath), process.env.PATH].join(NodePath.delimiter),
@@ -514,7 +526,7 @@ it.layer(layerGrokTextGenerationTest)("Grok memory generation", (it) => {
               ? generation.resolveMemoryConflict!({
                   ...memoryConflict,
                   modelSelection: selection,
-                }).pipe(Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome))
+                }).pipe(Effect.map((outcome): MemoryOutcome => outcome))
               : generation.generateMemorySummary!({ ...memorySummary, modelSelection: selection })
           ).pipe(Effect.flip);
           expect(failure._tag).toBe("TextGenerationError");
@@ -550,7 +562,13 @@ it.layer(layerGrokTextGenerationTest)("Grok memory generation", (it) => {
               const fiber = yield* (
                 operation === "resolveMemoryConflict"
                   ? generation.resolveMemoryConflict!(memoryConflict).pipe(
-                      Effect.map((outcome): M.GenerateMemorySummaryOutcome => outcome),
+                      Effect.map(
+                        (
+                          outcome,
+                        ):
+                          | M.GenerateMemorySummaryOutcome
+                          | M.ResolveMemoryConflictExecutionResult => outcome,
+                      ),
                     )
                   : generation.generateMemorySummary!(memorySummary)
               ).pipe(Effect.flip, Effect.forkChild);
