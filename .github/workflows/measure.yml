@@ -1,0 +1,42 @@
+name: Measure desktop release artifact upload
+on:
+  push:
+    branches: [bench/macos-artifact-upload]
+permissions:
+  contents: read
+jobs:
+  upload:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - name: Fetch the same released DMG and ZIP for both uploads
+        run: |
+          mkdir inputs
+          cd inputs
+          for ext in dmg zip; do
+            curl --fail --location --retry 3 -O "https://github.com/goat-si/goat/releases/download/v0.1.11/GOAT-0.1.11-arm64.$ext"
+          done
+          shasum -a 256 * > ../expected.sha256
+          cat ../expected.sha256
+      - name: Upload at level 6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          path: inputs/*
+          name: level-6
+          compression-level: 6
+          retention-days: 1
+      - name: Upload at level 0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          path: inputs/*
+          name: level-0
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          path: downloaded
+      - name: Verify both round trips
+        run: |
+          for level in 6 0; do
+            (cd "downloaded/level-$level" && shasum -a 256 -c ../../expected.sha256)
+          done
