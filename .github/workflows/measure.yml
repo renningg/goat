@@ -1,42 +1,35 @@
-name: Measure desktop release artifact upload
+name: Verify macOS package summary on release assets
 on:
   push:
     branches: [bench/macos-artifact-upload]
 permissions:
   contents: read
 jobs:
-  upload:
+  summary:
     runs-on: macos-15
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
-      - name: Fetch the same released DMG and ZIP for both uploads
+      - uses: actions/checkout@v4
+      - name: Download released artifacts
         run: |
           mkdir inputs
           cd inputs
           for ext in dmg zip; do
             curl --fail --location --retry 3 -O "https://github.com/goat-si/goat/releases/download/v0.1.11/GOAT-0.1.11-arm64.$ext"
           done
-          shasum -a 256 * > ../expected.sha256
-          cat ../expected.sha256
-      - name: Upload at level 6
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          path: inputs/*
-          name: level-6
-          compression-level: 6
-          retention-days: 1
-      - name: Upload at level 0
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          path: inputs/*
-          name: level-0
-          compression-level: 0
-          retention-days: 1
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          path: downloaded
-      - name: Verify both round trips
+      - name: Report bundle sizes
+        run: python3 .github/scripts/macos-package-sizes.py inputs | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Compare with independently extracted regular files
         run: |
-          for level in 6 0; do
-            (cd "downloaded/level-$level" && shasum -a 256 -c ../../expected.sha256)
-          done
+          unzip -q 'inputs/*.zip' -d extracted
+          python3 - <<'PY'
+          from pathlib import Path
+          import runpy
+          from zipfile import ZipFile
+          contents, = Path('extracted').glob('*.app/Contents')
+          disk = sum(p.stat().st_size for p in contents.rglob('*') if not p.is_symlink() and p.is_file())
+          with ZipFile(next(Path('inputs').glob('*.zip'))) as z:
+              indexed = sum(runpy.run_path('.github/scripts/macos-package-sizes.py')['bundle_sizes'](z).values())
+          print(f'Extracted regular file bytes: {disk}, reported bytes: {indexed}')
+          assert disk == indexed
+          PY
